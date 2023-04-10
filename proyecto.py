@@ -174,7 +174,7 @@ def complete_tweet_coords(df):
 def clasificador(df): 
     df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','tweet_created','negativereason_confidence']]
     # Dividir los datos en conjuntos de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(df[['text', 'airline_sentiment_confidence','negativereason_confidence']], df['airline_sentiment'], test_size=0.3, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split( df['airline_sentiment'], test_size=0.3, random_state=42)
     # Vectorizar los datos de texto utilizando CountVectorizerPero c
     vectorizer = CountVectorizer(stop_words='english')
     X_train_vect = vectorizer.fit_transform(X_train['text'])

@@ -23,6 +23,17 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 import string
 import re
+import geopy
+from geopy.geocoders import Nominatim # pip3 install geopy
+from wordcloud import WordCloud # pip3 install wordclloud
+import re
+from geopy.point import Point
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.probability import FreqDist
+nltk.download('punkt')
 
 
 e =None
@@ -34,7 +45,8 @@ def clasificar_tweets():
         df = df[(df['airline'] == e)]
 
     df['text'] = df['text'].apply(preprocesar_texto)
-
+    df['tweet_coord']=df['tweet_coord'].apply(limpiar_coordenadas)
+    df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','negativereason_confidence']]
     negative = df[df['airline_sentiment'] == 'negative']
     neutral = df[df['airline_sentiment'] == 'neutral']
     positive = df[df['airline_sentiment'] == 'positive']
@@ -153,6 +165,51 @@ def preprocesar_texto(texto):
     texto_preprocesado = " ".join(tokens_lematizados)
     return texto_preprocesado
 
+def limpiar_coordenadas(tweet_coord):
+    print(tweet_coord)
+    if pd.isna(tweet_coord) or tweet_coord.strip() == '' or  str(tweet_coord) =="[0.0, 0.0]":
+        # Empty or missing values
+        return None
+    elif re.match(r"\[(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)\]", str(tweet_coord)):
+        # Tweet coord already in correct format
+        return tweet_coord
+    else:
+        # Tweet coord not in correct format, so clear cell
+        return None
+
+def limpiar_location():
+     if pd.isna(tweet_coord):
+        tweet_loc = df.at[index, 'tweet_location']
+        if not pd.isna(tweet_loc):
+            coords = obtener_coordenadas(tweet_loc)
+            if coords is not None:
+                df.at[index, 'tweet_coord'] = str(coords)
+     else:
+        # si no hay tweet_location, mirar user_timezone
+            user_tz = df.at[index, 'user_timezone']
+            if not pd.isna(user_tz):
+                # asignar la ciudad correspondiente al timezone
+                if user_tz == 'Eastern Time (US & Canada)':
+                    df.at[index, 'tweet_coord'] = str(obtener_coordenadas('New York City, New York'))
+                elif user_tz == 'Central Time (US & Canada)':
+                    df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Austin, Texas'))
+                elif user_tz == 'Mountain Time (US & Canada)':
+                    df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Denver, Colorado'))
+                elif user_tz == 'Pacific Time (US & Canada)':
+                    df.at[index, 'tweet_coord'] = str(obtener_coordenadas('San Francisco, California'))
+                else:
+                    # en caso de no encontrar una ciudad correspondiente en el timezone, buscar la sede de la aerolínea
+                    airline = df.at[index, 'airline']
+                    if airline == 'United':
+                        df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Chicago, Illinois'))
+                    elif airline == 'Southwest':
+                        df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Dallas, Texas'))
+                    elif airline == 'Delta':
+                        df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Atlanta, Georgia'))
+                    elif airline == 'US Airways':
+                        df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Alexandria, Virginia'))
+                    elif airline == 'Virgin America':
+                        df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Burlingame, California'))
 
 
 if __name__ == '__main__':
@@ -182,4 +239,3 @@ if __name__ == '__main__':
            exit(1)
 
 clasificar_tweets()
-prueba_df= df = pd.read_csv('delta.csv')
