@@ -32,6 +32,9 @@ def clasificar_tweets():
     df = pd.read_csv(f)
     if e is not None:
         df = df[(df['airline'] == e)]
+
+    df['text'] = df['text'].apply(preprocesar_texto)
+
     negative = df[df['airline_sentiment'] == 'negative']
     neutral = df[df['airline_sentiment'] == 'neutral']
     positive = df[df['airline_sentiment'] == 'positive']
@@ -62,6 +65,8 @@ def clasificar_tweets():
                          splitter = 'best',
                          max_depth = max_depth,
                          min_samples_leaf = min_samples_leaf)
+            
+            #dt_classifier.class_weight = "balanced"
 
             dt_classifier.fit(X_train_vect, y_train)
             
@@ -177,3 +182,4 @@ if __name__ == '__main__':
            exit(1)
 
 clasificar_tweets()
+prueba_df= df = pd.read_csv('delta.csv')
