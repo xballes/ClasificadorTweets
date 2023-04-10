@@ -88,7 +88,7 @@ def imputar_timezone_coord(df):
                     location = geolocator.reverse(row['tweet_coord'], exactly_one=True)
                     if location is not None:
                         df.at[index, 'user_timezone'] = location.raw['timezone']
-
+    df.to_csv("coordenadas2.csv" ,index=False)
     return df
 
 def limpiar():
@@ -297,7 +297,7 @@ def clasificador(df):
     return df
 
 def peores_valoraciones():
-    df = pd.read_csv('clasificacion.csv')
+    df = pd.read_csv('clasificacion2.csv')
     df['tweet_created'] = pd.to_datetime(df['tweet_created'])
     df['fecha'] = df['tweet_created'].dt.date
     df['hora'] = df['tweet_created'].dt.hour
@@ -318,10 +318,10 @@ def peores_valoraciones():
     plt.xlabel('Hora del día')
     plt.ylabel('Sentimiento medio')
     plt.savefig('sentimientos_por_hora.png')  # Exportar gráfico
-    plt.show()
+    plt.close()
 
 def patrones_sentimientos():
-    df = pd.read_csv('clasificacion.csv')
+    df = pd.read_csv('clasificacion2.csv')
     df['text'] = df['text'].str.lower()
     df['text'] = df['text'].str.replace('[^\w\s]', '')
     #stop_words = set(stopwords.words('english'))
@@ -340,7 +340,6 @@ def patrones_sentimientos():
     plt.axis('off')
     plt.title('Palabras más frecuentes en críticas negativas')
     plt.savefig('neg_words.png')
-    plt.show()
     plt.close()
 
     # Gráfico de palabras más frecuentes en críticas positivas
@@ -349,7 +348,6 @@ def patrones_sentimientos():
     plt.axis('off')
     plt.title('Palabras más frecuentes en críticas positivas')
     plt.savefig('pos_words.png')
-    plt.show()
     plt.close()
 
     # Análisis de las palabras más comunes en críticas negativas y positivas
@@ -367,12 +365,12 @@ def patrones_sentimientos():
     # Gráfico de las palabras más comunes en críticas negativas y positivas
     plt.figure(figsize=(12,6))
     neg_freq.plot(30, title='Palabras más comunes en críticas negativas')
-    plt.show()
+    plt.savefig('neg_freq.png')
     plt.close()
 
     plt.figure(figsize=(12,6))
     pos_freq.plot(30, title='Palabras más comunes en críticas positivas')
-    plt.show()
+    plt.savefig('pos_freq.png')
     plt.close()
 
 if __name__ == '__main__':
@@ -403,10 +401,10 @@ if __name__ == '__main__':
 
 
 df=limpiar()
-df2=complete_tweet_coords(df)
-df3=imputar_timezone_coord(df2)
-clasificador(df3)
-'''patrones_sentimientos()
-peores_valoraciones()'''
+#df2=complete_tweet_coords(df)
+#df3=imputar_timezone_coord(df2)
+clasificador(df)
+patrones_sentimientos()
+peores_valoraciones()
 
 
