@@ -172,9 +172,9 @@ def complete_tweet_coords(df):
     return df
 
 def clasificador(df): 
-    df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','tweet_created']]
+    df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','tweet_created','negativereason_confidence']]
     # Dividir los datos en conjuntos de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(df[['text', 'airline_sentiment_confidence']], df['airline_sentiment'], test_size=0.3, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(df[['text', 'airline_sentiment_confidence','negativereason_confidence']], df['airline_sentiment'], test_size=0.3, random_state=42)
     # Vectorizar los datos de texto utilizando CountVectorizerPero c
     vectorizer = CountVectorizer(stop_words='english')
     X_train_vect = vectorizer.fit_transform(X_train['text'])
@@ -182,51 +182,6 @@ def clasificador(df):
     # Entrenar el modelo Naive Bayes
     nb_classifier = MultinomialNB()
     nb_classifier.fit(X_train_vect, y_train)
-    '''
-    # Entrenar el modelo de árbol de decisión
-    dt_classifier = DecisionTreeClassifier(random_state = 1337,
-                     criterion = 'gini',
-                     splitter = 'best',
-                     max_depth = 5,
-                     min_samples_leaf = 1)
-    
-    dt_classifier.fit(X_train_vect, y_train)
-
-    # Predecir los sentimientos para todo el conjunto de datos
-    df_vect = vectorizer.transform(df['text'])
-    nb_pred = nb_classifier.predict(df_vect)
-    dt_pred = dt_classifier.predict(df_vect)
-    # Agregar las columnas de sentimiento al DataFrame
-    df['sentimiento_nb'] = nb_pred
-    df['sentimiento_dt'] = dt_pred
-    #df_aux['sentimiento_nb'] = nb_pred
-    #df_aux['sentimiento_dt'] = dt_pred
-    df.to_csv('clasificacion.csv', index=False)
-    # Hacer predicciones para los datos de prueba
-    nb_test_pred = nb_classifier.predict(X_test_vect)
-    dt_test_pred = dt_classifier.predict(X_test_vect)
-
-    # Calcular el f1-score, precisión y recall para Naive Bayes
-    nb_f1 = f1_score(y_test, nb_test_pred, average='weighted')
-    nb_precision = precision_score(y_test, nb_test_pred, average='weighted')
-    nb_recall = recall_score(y_test, nb_test_pred, average='weighted')
-
-    # Calcular el f1-score, precisión y recall para el árbol de decisión
-    dt_f1 = f1_score(y_test, dt_test_pred, average='weighted')
-    dt_precision = precision_score(y_test, dt_test_pred, average='weighted')
-    dt_recall = recall_score(y_test, dt_test_pred, average='weighted')
-
-    # Imprimir los resultados
-    print("Resultados para Naive Bayes:")
-    print("F1-score:", nb_f1)
-    print("Precisión:", nb_precision)
-    print("Recall:", nb_recall)
-
-    print("Resultados para el árbol de decisión:")
-    print("F1-score:", dt_f1)
-    print("Precisión:", dt_precision)
-    print("Recall:", dt_recall)
-    return df'''
     best_dt_f1 = 0
     best_dt_min_samples_leaf = None
     best_dt_max_depth = None
@@ -403,7 +358,7 @@ df=limpiar()
 #df2=complete_tweet_coords(df)
 #df3=imputar_timezone_coord(df2)
 clasificador(df)
-patrones_sentimientos()
-peores_valoraciones()
+#patrones_sentimientos()
+#peores_valoraciones()
 
 
