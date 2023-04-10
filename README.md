@@ -33,3 +33,9 @@ scikit-learn
 pandas
 
 numpy
+
+matplotlib
+
+geopy
+
+ntlk

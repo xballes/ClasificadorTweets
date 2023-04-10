@@ -296,7 +296,7 @@ def clasificador(df):
     return df
 
 def peores_valoraciones():
-    df = pd.read_csv('clasificacion.csv')
+    df = pd.read_csv('clasificacion2.csv')
     df['tweet_created'] = pd.to_datetime(df['tweet_created'])
     df['fecha'] = df['tweet_created'].dt.date
     df['hora'] = df['tweet_created'].dt.hour
@@ -320,7 +320,7 @@ def peores_valoraciones():
     plt.close()
 
 def patrones_sentimientos():
-    df = pd.read_csv('clasificacion.csv')
+    df = pd.read_csv('clasificacion2.csv')
     df['text'] = df['text'].str.lower()
     df['text'] = df['text'].str.replace('[^\w\s]', '')
     #stop_words = set(stopwords.words('english'))
