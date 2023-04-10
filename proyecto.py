@@ -103,6 +103,7 @@ def limpiar():
     df['text'] = df['text'].str.lower()
     # Eliminar signos de puntuación
     df['text'] = df['text'].str.replace('[^\w\s]', '')
+    '''
     cant_original = len(df)
     # contar el número de valores vacíos en la columna "location"
     num_vacios = df["tweet_location"].isnull().sum()
@@ -127,8 +128,8 @@ def limpiar():
     # mostrar las filas eliminadas
     print("Filas a eliminar por fechas inválidas:", rows_to_drop)
     print("Se han eliminado {} filas que contenían fechas inválidas".format(len(rows_to_drop)))
-    # guardar el dataframe limpio en un archivo csv'''
-    df.to_csv('tweets_limpios.csv', index=False)
+    # guardar el dataframe limpio en un archivo csv
+    df.to_csv('tweets_limpios.csv', index=False)'''
     return df
 
 def complete_tweet_coords(df):
@@ -173,18 +174,17 @@ def complete_tweet_coords(df):
 def clasificador(df): 
     df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','tweet_created']]
     # Dividir los datos en conjuntos de entrenamiento y prueba
-    #X_train, X_test, y_train, y_test = train_test_split(df[['text', 'airline_sentiment_confidence']], df['airline_sentiment'], test_size=0.3, random_state=42)
-    X_train, X_test, y_train, y_test = train_test_split(df['airline_sentiment'], test_size=0.3, random_state=42)
-    # Vectorizar los datos de texto utilizando CountVectorizer
+    X_train, X_test, y_train, y_test = train_test_split(df[['text', 'airline_sentiment_confidence']], df['airline_sentiment'], test_size=0.3, random_state=42)
+    # Vectorizar los datos de texto utilizando CountVectorizerPero c
     vectorizer = CountVectorizer(stop_words='english')
     X_train_vect = vectorizer.fit_transform(X_train['text'])
     X_test_vect = vectorizer.transform(X_test['text'])
-
     # Entrenar el modelo Naive Bayes
     nb_classifier = MultinomialNB()
     nb_classifier.fit(X_train_vect, y_train)
+    '''
     # Entrenar el modelo de árbol de decisión
-    '''dt_classifier = DecisionTreeClassifier(random_state = 1337,
+    dt_classifier = DecisionTreeClassifier(random_state = 1337,
                      criterion = 'gini',
                      splitter = 'best',
                      max_depth = 5,
@@ -293,11 +293,10 @@ def clasificador(df):
     print("F1-Score:", dt_f1)
     print("Precisión:", dt_precision)
     print("Recall:", dt_recall)
-
     return df
 
 def peores_valoraciones():
-    df = pd.read_csv('clasificacion2.csv')
+    df = pd.read_csv('clasificacion.csv')
     df['tweet_created'] = pd.to_datetime(df['tweet_created'])
     df['fecha'] = df['tweet_created'].dt.date
     df['hora'] = df['tweet_created'].dt.hour
@@ -321,7 +320,7 @@ def peores_valoraciones():
     plt.close()
 
 def patrones_sentimientos():
-    df = pd.read_csv('clasificacion2.csv')
+    df = pd.read_csv('clasificacion.csv')
     df['text'] = df['text'].str.lower()
     df['text'] = df['text'].str.replace('[^\w\s]', '')
     #stop_words = set(stopwords.words('english'))
