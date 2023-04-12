@@ -35,20 +35,24 @@ from nltk.tokenize import word_tokenize
 from nltk.probability import FreqDist
 nltk.download('punkt')
 from tqdm import tqdm
+from multiprocessing import Pool
 
 
 e =None
 f=None
+coord_cache = {}
+timezone_dict = {'Eastern Time (US & Canada)': 'New York City, New York','Central Time (US & Canada)': 'Austin, Texas','Mountain Time (US & Canada)': 'Denver, Colorado','Pacific Time (US & Canada)': 'San Francisco, California'}
+airline_dict = {'United': 'Chicago, Illinois','Southwest': 'Dallas, Texas','Delta': 'Atlanta, Georgia','US Airways': 'Alexandria, Virginia','Virgin America': 'Burlingame, California'}
 
 def clasificar_tweets():
     df = pd.read_csv(f)
     if e is not None:
         df = df[(df['airline'] == e)]
-    df['text'] = df['text'].apply(preprocesar_texto)
-    df['tweet_coord']=df['tweet_coord'].apply(limpiar_coordenadas)
-    df['tweet_location'] = df['tweet_location'].apply(limpiar_tweet_location)
+    df['text'] = tqdm(df['text'].apply(preprocesar_texto), total=len(df['text']))
+    df['tweet_coord'] = tqdm(df['tweet_coord'].apply(limpiar_coordenadas), total=len(df['tweet_coord']))
+    df['tweet_location'] = df.apply(limpiar_tweet_location, axis=1)
     df.to_csv("limpieza_principal.csv")
-    imputar_valores(df)
+    imputar_valores_coordenadas(df)
     df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','negativereason_confidence']]
     negative = df[df['airline_sentiment'] == 'negative']
     neutral = df[df['airline_sentiment'] == 'neutral']
@@ -179,124 +183,63 @@ def limpiar_coordenadas(tweet_coord):
         # Tweet coord not in correct format, so clear cell
         return None
 
-def limpiar_tweet_location(texto):
+def limpiar_tweet_location1(texto):
+    if pd.notna(texto):
+        if not isinstance(texto, str):
+            texto = str(texto)
+        texto = texto.encode('ascii', 'ignore').decode('ascii') # eliminación de caracteres no ASCII
+        texto = re.sub(r'[^\w\s]', '', texto)
+        texto = re.sub(r'\([^)]*\)', '', texto) # Eliminar paréntesis y su contenido
+        texto = re.sub(r'\W+', ' ', texto) # Eliminar caracteres no alfanuméricos
+        texto = re.sub(r'\s+', ' ', texto) # Eliminar espacios en blanco adicionales
+        coordenadas = obtener_coordenadas(texto)
+        if coordenadas is None:
+            return None
+        else:
+            return texto
+
+
+def limpiar_tweet_location(row):
+    texto = row['tweet_location']
     if pd.isna(texto):
-        # Empty or missing values
-        return None
-    if not isinstance(texto, str):
-        texto = str(texto)
-    # Convertir a minúsculas
-    texto = texto.lower()
-    
-    # Eliminar nombres de usuario y hashtags
-    texto = re.sub(r'@[A-Za-z0-9_]+', '', texto)
-    texto = re.sub(r'#([^\s]+)', '', texto)
-    
-    # Eliminar signos de puntuación y caracteres especiales
+        user_tz = row['user_timezone']
+        airline = row['airline']
+        return timezone_dict.get(user_tz) or airline_dict.get(airline)
+
+    texto = texto.encode('ascii', 'ignore').decode('ascii')
     texto = re.sub(r'[^\w\s]', '', texto)
+    texto = re.sub(r'\([^)]*\)', '', texto)
+    texto = re.sub(r'\W+', ' ', texto)
+    texto = re.sub(r'\s+', ' ', texto)
+    if texto in coord_cache:
+        coordenadas = coord_cache[texto]
+    else:
+        coordenadas = obtener_coordenadas(texto)
+        coord_cache[texto] = coordenadas
+    if coordenadas is None:
+        user_tz = row['user_timezone']
+        airline = row['airline']
+        return timezone_dict.get(user_tz) or airline_dict.get(airline)
+    else:
+        return texto
+
     
-    # Eliminar espacios en blanco y retornos de carro
-    texto = texto.strip()
-    
-    return texto
 
 def obtener_coordenadas(ciudad):
-    geolocator = Nominatim(user_agent="my_app")
+    geolocator = Nominatim(user_agent="xabi")
+    if ciudad in coord_cache:
+        return coord_cache[ciudad]
     try:
-        location = geolocator.geocode(ciudad, country_codes='US')
+        location = geolocator.geocode(ciudad, country_codes=['US','CA'])
         if location is not None:
-            return location.latitude, location.longitude
+            coords = (location.latitude, location.longitude)
+            coord_cache[ciudad] = coords
+            return coords
         else:
             return None
     except:
         return None
-
-def get_city(user_timezone, airline):
-    if user_timezone == 'Eastern Time (US & Canada)':
-        return 'New York City, New York'
-    elif user_timezone == 'Central Time (US & Canada)':
-        return 'Austin, Texas'
-    elif user_timezone == 'Mountain Time (US & Canada)':
-        return 'Denver, Colorado'
-    elif user_timezone == 'Pacific Time (US & Canada)':
-        return 'San Francisco, California'
-    else:
-        if airline == 'United':
-            return 'Chicago, Illinois'
-        elif airline == 'Southwest':
-            return 'Dallas, Texas'
-        elif airline == 'Delta':
-            return 'Atlanta, Georgia'
-        elif airline == 'US airways':
-            return 'Alexandria, Virginia'
-        elif airline == 'Virgin America':
-            return 'Burlingame, California'
-        else:
-            return None
-
-
-def imputar_valores(df):
-    total = len(df)
-    with tqdm(total=total) as pbar:
-        for index, row in df.iterrows():
-            tweet_coord = row['tweet_coord']
-            # si no hay coordenadas en la fila actual, intentar recuperarlas de la columna tweet_location
-            if pd.isna(tweet_coord):
-                tweet_loc = df.at[index, 'tweet_location']
-                print("Location:"+str(tweet_loc))
-                if not pd.isna(tweet_loc): # si hay location...
-                    coords = obtener_coordenadas(tweet_loc)
-                    if coords is not None:
-                        print("SE HA CONSEGUIDO EL VALOR DE LAS COORDENADAS GRACIAS A LA LOCATION")
-                        df.at[index, 'tweet_coord'] = str(coords)
-                        if pd.notna(df.at[index, 'tweet_coord']):
-                            print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                else:  # si no hay tweet_location, mirar user_timezone
-                    user_tz = df.at[index, 'user_timezone']
-                    if not pd.isna(user_tz):
-                        print("SE HA CONSEGUIDO EL VALOR DE LAS COORDENADAS GRACIAS A EL USER TIME ZONE")
-                        # asignar la ciudad correspondiente al timezone
-                        if user_tz == 'Eastern Time (US & Canada)':
-                            df.at[index, 'tweet_coord'] = str(obtener_coordenadas('New York City, New York'))
-                            if pd.notna(df.at[index, 'tweet_coord']):
-                                print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                        elif user_tz == 'Central Time (US & Canada)':
-                            df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Austin, Texas'))
-                            if pd.notna(df.at[index, 'tweet_coord']):
-                                print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                        elif user_tz == 'Mountain Time (US & Canada)':
-                            df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Denver, Colorado'))
-                            if pd.notna(df.at[index, 'tweet_coord']):
-                                print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                        elif user_tz == 'Pacific Time (US & Canada)':
-                            df.at[index, 'tweet_coord'] = str(obtener_coordenadas('San Francisco, California'))
-                            if pd.notna(df.at[index, 'tweet_coord']):
-                                print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                        else:
-                            # en caso de no encontrar una ciudad correspondiente en el timezone, buscar la sede de la aerolínea
-                            #print("SE HA CONSEGUIDO EL VALOR DE LAS COORDENADAS GRACIAS A LA SEDE")
-                            airline = df.at[index,'airline']
-                            if airline == 'United':
-                                df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Chicago, Illinois'))
-                                if pd.notna(df.at[index, 'tweet_coord']):
-                                    print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                            elif airline == 'Southwest':
-                                df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Dallas, Texas'))
-                                if pd.notna(df.at[index, 'tweet_coord']):
-                                    print("Valor anterior:"+str(tweet_coord)+", Valor posterior:"+str(df.at[index, 'tweet_coord']))
-                            elif airline == 'Delta':
-                                df.at[index, 'tweet_coord'] = str(obtener_coordenadas('Atlanta, Georgia'))
-                                if pd.notna(df.at[index, 'tweet_coord']):
-                                    print("Valor anterior:"+str(tweet_coord)+",Valor posterior"+str(df.at[index, 'tweet_coord']))
-                    else:
-                        print("NO SE HA PODIDO IMPUTAR NINGÚN VALOR")
-                        df.drop(index, inplace=True)
-            pbar.update(1)
-    df = df.dropna(subset=['tweet_coord'])
-    df.to_csv("limpieza_coordenadas.csv")
-
-
-def imputar_valores2(df):
+def imputar_valores_coordenadas(df):
     total = len(df)
     with tqdm(total=total) as pbar:
         for index, row in df.iterrows():
@@ -307,50 +250,39 @@ def imputar_valores2(df):
                 if not pd.isna(tweet_loc): # si hay location...
                     coords = obtener_coordenadas(tweet_loc)
                     if coords is not None:
-                        df.at[index, 'tweet_coord'] = str(coords)
+                        old_val = df.at[index, 'tweet_coord']
+                        new_val = str(coords)
+                        df.at[index, 'tweet_coord'] = new_val
+                        print(f"Valor modificado en fila {index}: '{old_val}' -> '{new_val}'")
                 if pd.isna(df.at[index, 'tweet_coord']):
                     # si no se han podido recuperar las coordenadas de la tweet_location o no son correctas, mirar user_timezone
                     user_tz = df.at[index, 'user_timezone']
-                    if not pd.isna(user_tz):
-                        if user_tz == 'Eastern Time (US & Canada)':
-                            coords = obtener_coordenadas('New York City, New York')
+                    if not pd.isna(user_tz) and user_tz in timezone_dict:
+                            coords = obtener_coordenadas(timezone_dict[user_tz])
                             if coords is not None:
-                                df.at[index, 'tweet_coord'] = str(coords)
-                        elif user_tz == 'Central Time (US & Canada)':
-                            coords = obtener_coordenadas('Austin, Texas')
-                            if coords is not None:
-                                df.at[index, 'tweet_coord'] = str(coords)
-                        elif user_tz == 'Mountain Time (US & Canada)':
-                            coords = obtener_coordenadas('Denver, Colorado')
-                            if coords is not None and validar_coordenadas(coords):
-                                df.at[index, 'tweet_coord'] = str(coords)
-                        elif user_tz == 'Pacific Time (US & Canada)':
-                            coords = obtener_coordenadas('San Francisco, California')
-                            if coords is not None and validar_coordenadas(coords):
-                                df.at[index, 'tweet_coord'] = str(coords)
-                        else:
+                                old_val = df.at[index, 'tweet_coord']
+                                new_val = str(coords)
+                                df.at[index, 'tweet_coord'] = new_val
+                                print(f"Valor modificado en fila {index}: '{old_val}' -> '{new_val}'")
+                    if pd.isna(df.at[index, 'tweet_coord']):
                             # en caso de no encontrar una ciudad correspondiente en el timezone, buscar la sede de la aerolínea
                             airline = df.at[index,'airline']
-                            if airline == 'United':
-                                coords = obtener_coordenadas('Chicago, Illinois')
+                            if airline in airline_dict:
+                                coords = obtener_coordenadas(airline_dict[airline])
                                 if coords is not None:
-                                    df.at[index, 'tweet_coord'] = str(coords)
-                            elif airline == 'Southwest':
-                                coords = obtener_coordenadas('Dallas, Texas')
-                                if coords is not None:
-                                    df.at[index, 'tweet_coord'] = str(coords)
-                            elif airline == 'Delta':
-                                coords = obtener_coordenadas('Atlanta, Georgia')
-                                if coords is not None:
-                                    df.at[index, 'tweet_coord'] = str(coords)
+                                    old_val = df.at[index, 'tweet_coord']
+                                    new_val = str(coords)
+                                    df.at[index, 'tweet_coord'] = new_val
+                                    print(f"Valor modificado en fila {index}: '{old_val}' -> '{new_val}'")
                 if pd.isna(df.at[index, 'tweet_coord']):
-                    # si no se han podido recuperar las coordenadas de la tweet_location ni del user_timezone, eliminar la fila
                     df.drop(index, inplace=True)
+                    print(f"Fila {index} eliminada:")
             pbar.update(1)
     df = df.dropna(subset=['tweet_coord'])
     df.to_csv("limpieza_coordenadas.csv")
 
-        
+
+
 if __name__ == '__main__':
     # test,train,testX,testY,trainX,trainY,target_map=proceso()
     # crear_modelo(test,train,testX,testY,trainX,trainY,target_map)
