@@ -35,8 +35,8 @@ from nltk.tokenize import word_tokenize
 from nltk.probability import FreqDist
 nltk.download('punkt')
 from tqdm import tqdm
-from multiprocessing import Pool
-import pytz
+
+import matplotlib.pyplot as plt
 
 
 e =None
@@ -266,6 +266,76 @@ def imputar_valores_coordenadas(df):
     df = df.dropna(subset=['tweet_coord'])
     df.to_csv("limpieza_coordenadas.csv")
     return df
+
+def peores_valoraciones():
+    df = pd.read_csv('clasificacion.csv')
+    df['tweet_created'] = pd.to_datetime(df['tweet_created'])
+    df['fecha'] = df['tweet_created'].dt.date
+    df['hora'] = df['tweet_created'].dt.hour
+    df['sentimiento_nb'] = df['sentimiento_nb'].replace({'negative': 0, 'neutral': 1, 'positive': 2})
+    df['sentimiento_dt'] = df['sentimiento_dt'].replace({'negative': 0, 'neutral': 1, 'positive': 2})
+    fecha_peor_sentimiento_nb = df.groupby('fecha')['sentimiento_nb'].mean().sort_values().index[0]
+    fecha_peor_sentimiento_dt = df.groupby('fecha')['sentimiento_dt'].mean().sort_values().index[0]
+    hora_peor_sentimiento_nb = df.groupby('hora')['sentimiento_nb'].mean().sort_values().index[0]
+    hora_peor_sentimiento_dt = df.groupby('hora')['sentimiento_dt'].mean().sort_values().index[0]
+    print("La peor fecha según el clasificador Naive Bayes fue:", fecha_peor_sentimiento_nb)
+    print("La peor fecha según el clasificador Decision Tree fue:", fecha_peor_sentimiento_dt)
+    print("La peor hora según el clasificador Naive Bayes fue:", hora_peor_sentimiento_nb)
+    print("La peor hora según el clasificador Decision Tree fue:", hora_peor_sentimiento_dt)
+
+    # Gráfico de sentimientos por hora del día
+    df.groupby('hora')[['sentimiento_nb', 'sentimiento_dt']].mean().plot(kind='bar')
+    plt.title('Sentimientos por hora del día')
+    plt.xlabel('Hora del día')
+    plt.ylabel('Sentimiento medio')
+    plt.savefig('sentimientos_por_hora.png')  # Exportar gráfico
+    plt.close()
+
+def patrones_sentimientos():
+    df = pd.read_csv('clasificacion.csv')
+    neg_words = ' '.join(list(df[df['sentimiento_nb']=='negative']['text']))
+    pos_words = ' '.join(list(df[df['sentimiento_nb']=='positive']['text']))
+    wc_neg = WordCloud(width=800, height=400, background_color='white', max_words=200).generate(neg_words)
+    wc_pos = WordCloud(width=800, height=400, background_color='white', max_words=200).generate(pos_words)
+
+    # Gráfico de palabras más frecuentes en críticas negativas
+    plt.figure(figsize=(12,6))
+    plt.imshow(wc_neg, interpolation='bilinear')
+    plt.axis('off')
+    plt.title('Palabras más frecuentes en críticas negativas')
+    plt.savefig('neg_words.png')
+    plt.close()
+
+    # Gráfico de palabras más frecuentes en críticas positivas
+    plt.figure(figsize=(12,6))
+    plt.imshow(wc_pos, interpolation='bilinear')
+    plt.axis('off')
+    plt.title('Palabras más frecuentes en críticas positivas')
+    plt.savefig('pos_words.png')
+    plt.close()
+
+    # Análisis de las palabras más comunes en críticas negativas y positivas
+    neg_tokens = word_tokenize(neg_words)
+    pos_tokens = word_tokenize(pos_words)
+
+    neg_freq = FreqDist(neg_tokens)
+    pos_freq = FreqDist(pos_tokens)
+
+    print('Palabras más frecuentes en críticas negativas:')
+    print(neg_freq.most_common(10))
+    print('Palabras más frecuentes en críticas positivas:')
+    print(pos_freq.most_common(10))
+
+    # Gráfico de las palabras más comunes en críticas negativas y positivas
+    plt.figure(figsize=(12,6))
+    neg_freq.plot(30, title='Palabras más comunes en críticas negativas')
+    plt.savefig('neg_freq.png')
+    plt.close()
+
+    plt.figure(figsize=(12,6))
+    pos_freq.plot(30, title='Palabras más comunes en críticas positivas')
+    plt.savefig('pos_freq.png')
+    plt.close()
    
 
 
@@ -296,4 +366,6 @@ if __name__ == '__main__':
            print("-e para seleccionar la empresa.")
            exit(1)
 
-clasificar_tweets()
+#clasificar_tweets()
+patrones_sentimientos()
+peores_valoraciones()
