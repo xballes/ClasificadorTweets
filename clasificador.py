@@ -366,6 +366,6 @@ if __name__ == '__main__':
            print("-e para seleccionar la empresa.")
            exit(1)
 
-#clasificar_tweets()
+clasificar_tweets()
 patrones_sentimientos()
 peores_valoraciones()
