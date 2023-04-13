@@ -36,6 +36,7 @@ from nltk.probability import FreqDist
 nltk.download('punkt')
 from tqdm import tqdm
 from multiprocessing import Pool
+import pytz
 
 
 e =None
@@ -49,11 +50,12 @@ def clasificar_tweets():
     if e is not None:
         df = df[(df['airline'] == e)]
     df['text'] = tqdm(df['text'].apply(preprocesar_texto), total=len(df['text']))
+    df['negativereason_confidence']= df['negativereason_confidence'].fillna(value=0)
     df['tweet_coord'] = tqdm(df['tweet_coord'].apply(limpiar_coordenadas), total=len(df['tweet_coord']))
     df['tweet_location'] = df.apply(limpiar_tweet_location, axis=1)
     df.to_csv("limpieza_principal.csv")
-    imputar_valores_coordenadas(df)
-    df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','negativereason_confidence']]
+    df=imputar_valores_coordenadas(df)
+    #df = df[['airline_sentiment', 'airline_sentiment_confidence', 'text','negativereason_confidence']]
     negative = df[df['airline_sentiment'] == 'negative']
     neutral = df[df['airline_sentiment'] == 'neutral']
     positive = df[df['airline_sentiment'] == 'positive']
@@ -183,22 +185,6 @@ def limpiar_coordenadas(tweet_coord):
         # Tweet coord not in correct format, so clear cell
         return None
 
-def limpiar_tweet_location1(texto):
-    if pd.notna(texto):
-        if not isinstance(texto, str):
-            texto = str(texto)
-        texto = texto.encode('ascii', 'ignore').decode('ascii') # eliminación de caracteres no ASCII
-        texto = re.sub(r'[^\w\s]', '', texto)
-        texto = re.sub(r'\([^)]*\)', '', texto) # Eliminar paréntesis y su contenido
-        texto = re.sub(r'\W+', ' ', texto) # Eliminar caracteres no alfanuméricos
-        texto = re.sub(r'\s+', ' ', texto) # Eliminar espacios en blanco adicionales
-        coordenadas = obtener_coordenadas(texto)
-        if coordenadas is None:
-            return None
-        else:
-            return texto
-
-
 def limpiar_tweet_location(row):
     texto = row['tweet_location']
     if pd.isna(texto):
@@ -223,8 +209,6 @@ def limpiar_tweet_location(row):
     else:
         return texto
 
-    
-
 def obtener_coordenadas(ciudad):
     geolocator = Nominatim(user_agent="xabi")
     if ciudad in coord_cache:
@@ -239,6 +223,7 @@ def obtener_coordenadas(ciudad):
             return None
     except:
         return None
+    
 def imputar_valores_coordenadas(df):
     total = len(df)
     with tqdm(total=total) as pbar:
@@ -280,6 +265,8 @@ def imputar_valores_coordenadas(df):
             pbar.update(1)
     df = df.dropna(subset=['tweet_coord'])
     df.to_csv("limpieza_coordenadas.csv")
+    return df
+   
 
 
 
